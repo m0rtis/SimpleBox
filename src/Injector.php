@@ -7,9 +7,21 @@ namespace m0rtis\SimpleBox;
 
 use Psr\Container\ContainerInterface;
 
+/**
+ * Class Injector
+ * @package m0rtis\SimpleBox
+ */
 final class Injector implements DependencyInjectorInterface
 {
+    /**
+     * @var ContainerInterface
+     */
     private $container;
+
+    /**
+     * Injector constructor.
+     * @param ContainerInterface $container
+     */
     public function __construct(ContainerInterface $container)
     {
         $this->container = $container;

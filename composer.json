@@ -1,7 +1,8 @@
 {
     "name": "m0rtis/SimpleBox",
     "description": "Simple PSR-11 container with autowiring",
-    "type": "lib",
+    "keywords": ["PSR-11", "container", "DI", "dependency injection", "autowiring"],
+    "type": "library",
     "authors": [
         {
             "name": "m0rtis",
@@ -27,5 +28,8 @@
         "psr-4": {
             "m0rtis\\SimpleBox\\Tests\\": "tests/"
         }
+    },
+    "provide": {
+        "psr/container-implementation": "^1.0"
     }
 }
