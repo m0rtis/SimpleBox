@@ -39,13 +39,7 @@ final class Injector implements DependencyInjectorInterface
         $self = $this;
         $constructor = (new \ReflectionClass($className))->getConstructor();
         $deps = array_filter($this->getDependencies($constructor), function ($type, $name) use ($container, $self) {
-            if ($container->has($type) || $container->has($name)) {
-                return false;
-            }
-            if (\class_exists($type)) {
-                return !$self->canInstantiate($type);
-            }
-            return true;
+            return !($container->has($type) || $container->has($name));
         }, ARRAY_FILTER_USE_BOTH);
         if (empty($deps)) {
             $answer = true;
@@ -69,8 +63,6 @@ final class Injector implements DependencyInjectorInterface
                 $arguments[$name] = $this->container->get($type);
             } elseif ($this->container->has($name)) {
                 $arguments[$name] = $this->container->get($name);
-            } elseif (\class_exists($type)) {
-                $arguments[$name] = $this->instantiate($type);
             }
         }
         return $reflect->newInstanceArgs($arguments);

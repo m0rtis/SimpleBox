@@ -8,6 +8,7 @@ namespace m0rtis\SimpleBox\Tests;
 use m0rtis\SimpleBox\Container;
 use m0rtis\SimpleBox\ContainerFactory;
 use PHPUnit\Framework\TestCase;
+use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 
 class ContainerTest extends TestCase
@@ -17,13 +18,32 @@ class ContainerTest extends TestCase
         return new Container($data, $definitions);
     }
 
-    public function testOffsetUnset(): void
+    public function testOffsetMethods(): void
     {
         $container = $this->getContainer(['testKey' => 'testValue']);
         $this->assertArrayHasKey('testKey', $container);
+        $this->assertSame('testValue', $container['testKey']);
 
         unset($container['testKey']);
         $this->assertArrayNotHasKey('testKey', $container);
+
+        $container['testKey'] = 'test';
+        $this->assertSame('test', $container['testKey']);
+    }
+
+    public function testIterate(): void
+    {
+        $container = $this->getContainer([
+            'firstKey' => 'firstValue',
+            'secondKey' => 'secondValue'
+        ]);
+        $result = [];
+        foreach ($container as $key => $item) {
+            $result[$item] = $key;
+        }
+
+        $this->assertArrayHasKey('secondValue', $result);
+        $this->assertEquals('firstKey', $result['firstValue']);
     }
 
     public function testCount(): void
@@ -35,17 +55,27 @@ class ContainerTest extends TestCase
     {
         $container = $this->getContainer(
             [
-                Container::class => ContainerFactory::class
+                Container::class => function ($c) {
+                    /** @var ContainerInterface $c */
+                    return $c->get('test2');
+                }
             ],
             [
                 'test' => Container::class,
-                'test2' => ContainerFactory::class
+                'test2' => function ($c) {
+                    /** @var ContainerInterface $c */
+                    $factory = $c->get(ContainerFactory::class);
+                    return $factory();
+                }
             ]
         );
         $test = $container->get('test');
-        $test2 = $container->get('test2');
-
         $this->assertInstanceOf(Container::class, $test);
+
+        $container2 = $this->getContainer([
+            Container::class => ContainerFactory::class
+        ]);
+        $test2 = $container2->get(Container::class);
         $this->assertInstanceOf(Container::class, $test2);
     }
 

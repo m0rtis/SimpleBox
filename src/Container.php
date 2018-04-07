@@ -236,12 +236,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
                 $resolved = $this->get($definition);
             }
         } else {
-            $instance = $this->injector->instantiate($id);
-            if (false !== \stripos($id, 'factory') && \is_callable($instance)) {
-                $resolved = $instance($this);
-            } else {
-                $resolved = $instance;
-            }
+            $resolved = $this->injector->instantiate($id);
         }
         return $resolved;
     }
@@ -272,10 +267,19 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
         $item = $this->data[$id] ?? $id;
         if (\is_string($item) && $this->canResolve($item)) {
             try{
-                return $this->resolve($item);
+                $resolved = $this->resolve($item);
+                if ($id !== $item
+                    && \is_callable($resolved)
+                    && false !== \stripos($item, 'factory')
+                ) {
+                    $resolved = $resolved($this);
+                }
+                $item = $resolved;
             } catch (\Exception $e) {
                 throw new ContainerException($e);
             }
+        } elseif (\is_callable($item)) {
+            $item = $item($this);
         }
         return $item;
     }
