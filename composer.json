@@ -1,5 +1,5 @@
 {
-    "name": "m0rtis/SimpleBox",
+    "name": "m0rtis/simple-box",
     "description": "Simple PSR-11 container with autowiring",
     "keywords": ["PSR-11", "container", "DI", "dependency injection", "autowiring"],
     "type": "library",
