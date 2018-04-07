@@ -1,0 +1,31 @@
+{
+    "name": "m0rtis/SimpleBox",
+    "description": "Simple PSR-11 container with autowiring",
+    "type": "lib",
+    "authors": [
+        {
+            "name": "m0rtis",
+            "email": "mail@m0rtis.ru"
+        }
+    ],
+    "license": "Apache-2.0",
+    "minimum-stability": "dev",
+    "require": {
+        "php": "^7.2",
+        "psr/container": "^1.0"
+    },
+    "require-dev": {
+        "roave/security-advisories": "dev-master",
+        "phpunit/phpunit": "^7.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "m0rtis\\SimpleBox\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "m0rtis\\SimpleBox\\Tests\\": "tests/"
+        }
+    }
+}
