@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace m0rtis\SimpleBox\Tests;
 
+use m0rtis\SimpleBox\Container;
 use m0rtis\SimpleBox\Tests\Mocks\ClassWithDependencies;
+use PHPUnit\Framework\TestCase;
 
 
-final class InjectorTest extends ContainerTest
+final class InjectorTest extends TestCase
 {
     public function testGetAutowiring(): void
     {
-        $container = $this->getContainer([
+        $container = new Container([
             'config' => [
                 'testKey' => 'testValue'
             ]

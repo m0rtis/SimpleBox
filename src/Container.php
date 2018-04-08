@@ -20,25 +20,32 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     protected $data;
     /**
-     * @var iterable
-     */
-    protected $definitions;
-    /**
      * @var DependencyInjectorInterface
      */
     private $injector;
+    /**
+     * @var bool
+     */
+    private $returnShared;
+    /**
+     * @var array
+     */
+    private $retrieved;
 
     /**
      * Container constructor.
      * @param iterable $data
-     * @param iterable $definitions
      * @param DependencyInjectorInterface|null $injector
+     * @param bool $returnShared
      */
-    public function __construct(iterable $data = [], iterable $definitions = [], ?DependencyInjectorInterface $injector = null)
-    {
+    public function __construct(
+        iterable $data = [],
+        ?DependencyInjectorInterface $injector = null,
+        bool $returnShared = true
+    ) {
         $this->data = $data;
-        $this->definitions = $definitions;
         $this->injector = $injector ?? new Injector($this);
+        $this->returnShared = $returnShared;
     }
 
     /**
@@ -54,6 +61,9 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     public function get($id)
     {
         if ($this->has($id)) {
+            if ($this->returnShared) {
+                return $this->checkRetrieved($id);
+            }
             return $this->getLazy($id);
         }
 
@@ -74,6 +84,28 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     public function has($id): bool
     {
         return isset($this->data[$id]) || $this->canResolve($id);
+    }
+
+    /**
+     * @param string $id
+     * @return mixed
+     */
+    public function build(string $id)
+    {
+        if (isset($this->retrieved[$id])) {
+            $storeData = $this->data[$id];
+            $shared = $this->returnShared;
+            $this->data[$id] = $this->retrieved[$id];
+            $this->returnShared = false;
+
+            $result = $this->get($id);
+
+            $this->data[$id] = $storeData;
+            $this->returnShared = $shared;
+        } else {
+            $result = $this->getLazy($id);
+        }
+        return $result;
     }
 
     /**
@@ -214,7 +246,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     private function canResolve(string $id): bool
     {
-        $result = $this->checkDefinitions($id);
+        $result = isset($this->data[$id]);
         if (!$result && class_exists($id)) {
             $result = $this->injector->canInstantiate($id);
         }
@@ -228,33 +260,14 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     private function resolve(string $id)
     {
         $resolved = null;
-        if ($this->checkDefinitions($id)) {
-            $definition = $this->definitions[$id];
-            if (\is_callable($definition)) {
-                $resolved = $definition($this);
-            } elseif ($this->has((string)$definition)) {
-                $resolved = $this->get($definition);
-            }
+        if (\is_callable($id)) {
+            $resolved = $id($this);
+        } elseif (isset($this->data[$id])) {
+            $resolved = $this->getLazy($id);
         } else {
             $resolved = $this->injector->instantiate($id);
         }
         return $resolved;
-    }
-
-    /**
-     * @param string $id
-     * @return bool
-     */
-    private function checkDefinitions(string $id): bool
-    {
-        $result = false;
-        if (isset($this->definitions[$id])){
-            $def = $this->definitions[$id];
-            if (\is_callable($def) || $this->has((string)$def)) {
-                $result = true;
-            }
-        }
-        return $result;
     }
 
     /**
@@ -278,9 +291,23 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
             } catch (\Exception $e) {
                 throw new ContainerException($e);
             }
-        } elseif (\is_callable($item)) {
+        } elseif ($item instanceof \Closure) {
             $item = $item($this);
         }
+
         return $item;
+    }
+
+    /**
+     * @param $id
+     * @return mixed
+     */
+    private function checkRetrieved($id)
+    {
+        if (!isset($this->retrieved[$id]) && isset($this->data[$id])) {
+            $this->retrieved[$id] = $this->data[$id];
+        }
+        $this->data[$id] = $this->getLazy($id);
+        return $this->data[$id];
     }
 }
