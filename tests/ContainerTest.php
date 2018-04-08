@@ -13,9 +13,9 @@ use Psr\Container\NotFoundExceptionInterface;
 
 class ContainerTest extends TestCase
 {
-    protected function getContainer(array $data = [], array $definitions = []): Container
+    protected function getContainer(array $data = []): Container
     {
-        return new Container($data, $definitions);
+        return new Container($data);
     }
 
     public function testOffsetMethods(): void
@@ -58,9 +58,7 @@ class ContainerTest extends TestCase
                 Container::class => function ($c) {
                     /** @var ContainerInterface $c */
                     return $c->get('test2');
-                }
-            ],
-            [
+                },
                 'test' => Container::class,
                 'test2' => function ($c) {
                     /** @var ContainerInterface $c */
@@ -85,5 +83,33 @@ class ContainerTest extends TestCase
 
         $this->expectException(NotFoundExceptionInterface::class);
         $container->get('invalidKey');
+    }
+
+    public function testSharedRetrieving(): Container
+    {
+        $container = $this->getContainer([
+                Container::class => ContainerFactory::class,
+                ContainerInterface::class => Container::class
+            ]
+        );
+
+        $result1 = $container->get(ContainerInterface::class);
+        $result2 = $container->get(ContainerInterface::class);
+
+        $this->assertSame($result1, $result2);
+
+        return $container;
+    }
+
+    /**
+     * @depends testSharedRetrieving
+     * @param Container $container
+     */
+    public function testBuild(Container $container): void
+    {
+        $result1 = $container->build(ContainerInterface::class);
+        $result2 = $container->build(ContainerInterface::class);
+
+        $this->assertNotSame($result1, $result2);
     }
 }
