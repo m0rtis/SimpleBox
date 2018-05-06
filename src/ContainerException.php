@@ -21,7 +21,7 @@ final class ContainerException extends \RuntimeException implements ContainerExc
     {
         $exceptionClass = \get_class($previousException);
         $message = \sprintf(
-            'Exception %s thrown with message: %s',
+            'Exception %s has thrown with message: %s',
             $exceptionClass,
             $previousException->getMessage()
         );

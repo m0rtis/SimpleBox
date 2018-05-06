@@ -20,7 +20,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     protected $data;
     /**
-     * @var DependencyInjectorInterface
+     * @var DependencyInjectorInterface|null
      */
     private $injector;
     /**
@@ -36,16 +36,20 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      * Container constructor.
      * @param iterable $data
      * @param DependencyInjectorInterface|null $injector
-     * @param bool $returnShared
      */
-    public function __construct(
-        iterable $data = [],
-        ?DependencyInjectorInterface $injector = null,
-        bool $returnShared = true
-    ) {
+    public function __construct(iterable $data = [], ?DependencyInjectorInterface $injector = null)
+    {
         $this->data = $data;
-        $this->injector = $injector ?? new Injector($this);
-        $this->returnShared = $returnShared;
+
+        $config = $data['config'][ContainerInterface::class] ?? [];
+        $this->returnShared = (bool)($config['return_shared'] ?? true);
+
+        if (!$injector && $this->has(DependencyInjectorInterface::class)) {
+            $injector = $this->get(DependencyInjectorInterface::class);
+        }
+        if ($injector instanceof DependencyInjectorInterface) {
+            $this->injector = $injector;
+        }
     }
 
     /**
@@ -89,8 +93,9 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     /**
      * @param string $id
      * @return mixed
+     * @throws ContainerException
      */
-    public function build(string $id)
+    public function create(string $id)
     {
         if (isset($this->retrieved[$id])) {
             $storeData = $this->data[$id];
@@ -127,7 +132,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     public function next(): void
     {
-        next($this->data);
+        \next($this->data);
     }
 
     /**
@@ -138,7 +143,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     public function key()
     {
-        return key($this->data);
+        return \key($this->data);
     }
 
     /**
@@ -161,7 +166,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     public function rewind(): void
     {
-        reset($this->data);
+        \reset($this->data);
     }
 
     /**
@@ -247,8 +252,12 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     private function canResolve(string $id): bool
     {
         $result = isset($this->data[$id]);
-        if (!$result && class_exists($id)) {
-            $result = $this->injector->canInstantiate($id);
+        if (!$result) {
+            if($this->injector && \class_exists($id)) {
+                $result = $this->injector->canInstantiate($id);
+            } else {
+                $result = $this->isCallable($id);
+            }
         }
         return $result;
     }
@@ -256,15 +265,18 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     /**
      * @param string $id
      * @return mixed
+     * @throws ContainerException
      */
     private function resolve(string $id)
     {
         $resolved = null;
         if (\is_callable($id)) {
             $resolved = $id($this);
+        } elseif ($this->isInvokable($id)) {
+            $resolved = new $id();
         } elseif (isset($this->data[$id])) {
             $resolved = $this->getLazy($id);
-        } else {
+        } elseif ($this->injector) {
             $resolved = $this->injector->instantiate($id);
         }
         return $resolved;
@@ -273,6 +285,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     /**
      * @param string $id
      * @return mixed
+     * @throws \RuntimeException
      * @throws ContainerException
      */
     private function getLazy(string $id)
@@ -282,32 +295,76 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
             try{
                 $resolved = $this->resolve($item);
                 if ($id !== $item
-                    && \is_callable($resolved)
+                    && $this->isCallable($resolved)
                     && false !== \stripos($item, 'factory')
                 ) {
-                    $resolved = $resolved($this);
+                    $resolved = $this->call($resolved);
                 }
                 $item = $resolved;
             } catch (\Exception $e) {
                 throw new ContainerException($e);
             }
-        } elseif ($item instanceof \Closure) {
-            $item = $item($this);
+        } elseif (\is_callable($item)) {
+            $item = $this->call($item);
         }
-
         return $item;
     }
 
     /**
-     * @param $id
+     * @param string $id
      * @return mixed
+     * @throws ContainerException
      */
-    private function checkRetrieved($id)
+    private function checkRetrieved(string $id)
     {
         if (!isset($this->retrieved[$id]) && isset($this->data[$id])) {
             $this->retrieved[$id] = $this->data[$id];
         }
         $this->data[$id] = $this->getLazy($id);
         return $this->data[$id];
+    }
+
+    /**
+     * @param mixed $var
+     * @return bool
+     */
+    private function isCallable($var): bool
+    {
+        $result = \is_callable($var);
+        if (!$result && \is_string($var) && $this->isInvokable($var)) {
+            $result = true;
+        }
+        return $result;
+    }
+
+    /**
+     * @param $callable
+     * @return mixed
+     * @throws \RuntimeException
+     */
+    private function call($callable)
+    {
+        if (\is_callable($callable)) {
+            $result = $callable($this);
+        } elseif ($this->isInvokable($callable)) {
+            $result = (new $callable())($this);
+        } else {
+            throw new \RuntimeException(
+                sprintf(
+                    'Unable to call. The type of given callable is %s',
+                    \gettype($callable)
+                )
+            );
+        }
+        return $result;
+    }
+
+    /**
+     * @param string $class
+     * @return bool
+     */
+    private function isInvokable(string $class): bool
+    {
+        return \class_exists($class) && \method_exists($class, '__invoke');
     }
 }

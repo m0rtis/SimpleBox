@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace m0rtis\SimpleBox;
 
 
+use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 
 /**
- * Class Injector
+ * Class AutoWiringInjector
  * @package m0rtis\SimpleBox
  */
-final class Injector implements DependencyInjectorInterface
+final class AutoWiringInjector implements DependencyInjectorInterface
 {
     /**
      * @var ContainerInterface
@@ -19,7 +20,7 @@ final class Injector implements DependencyInjectorInterface
     private $container;
 
     /**
-     * Injector constructor.
+     * AutoWiringInjector constructor.
      * @param ContainerInterface $container
      */
     public function __construct(ContainerInterface $container)
@@ -36,9 +37,8 @@ final class Injector implements DependencyInjectorInterface
     {
         $answer = false;
         $container = $this->container;
-        $self = $this;
         $constructor = (new \ReflectionClass($className))->getConstructor();
-        $deps = array_filter($this->getDependencies($constructor), function ($type, $name) use ($container, $self) {
+        $deps = \array_filter($this->getDependencies($constructor), function ($name, $type) use ($container) {
             return !($container->has($type) || $container->has($name));
         }, ARRAY_FILTER_USE_BOTH);
         if (empty($deps)) {
@@ -62,14 +62,21 @@ final class Injector implements DependencyInjectorInterface
             if ($this->container->has($type)) {
                 $arguments[$name] = $this->container->get($type);
             } elseif ($this->container->has($name)) {
-                $arguments[$name] = $this->container->get($name);
+                if ('config' === $name) {
+                    $config = $this->container->get('config');
+                    $arguments[$name] = $config[$name] ?? $config;
+                } else {
+                    $arguments[$name] = $this->container->get($name);
+                }
+            } elseif (ContainerInterface::class === $type) {
+                $arguments[$name] = $this->container;
             }
         }
         return $reflect->newInstanceArgs($arguments);
     }
 
     /**
-     * @param \ReflectionMethod $constructor
+     * @param \ReflectionMethod|null $constructor
      * @return array
      */
     private function getDependencies(?\ReflectionMethod $constructor): array
@@ -92,11 +99,20 @@ final class Injector implements DependencyInjectorInterface
     {
         $names = [];
         foreach ($deps as $dep) {
-            if (!$dep->hasType()) {
-                continue;
+            if ($dep->hasType()) {
+                $names[$dep->getName()] = $dep->getType()->getName();
             }
-            $names[$dep->getName()] = $dep->getType()->getName();
         }
         return $names;
+    }
+
+    /**
+     * @param $className
+     * @return mixed
+     * @throws ContainerExceptionInterface
+     */
+    private function getConfigForClass($className)
+    {
+
     }
 }

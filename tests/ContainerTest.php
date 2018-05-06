@@ -5,16 +5,21 @@ declare(strict_types=1);
 namespace m0rtis\SimpleBox\Tests;
 
 
+use m0rtis\SimpleBox\AutoWiringInjectorFactory;
 use m0rtis\SimpleBox\Container;
-use m0rtis\SimpleBox\ContainerFactory;
+use m0rtis\SimpleBox\AutoWiringInjector;
+use m0rtis\SimpleBox\DependencyInjectorInterface;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 
 class ContainerTest extends TestCase
 {
-    protected function getContainer(array $data = []): Container
+    protected function getContainer(iterable $data = [], bool $di = true): Container
     {
+        if ($di) {
+            $data[DependencyInjectorInterface::class] = AutoWiringInjectorFactory::class;
+        }
         return new Container($data);
     }
 
@@ -39,7 +44,9 @@ class ContainerTest extends TestCase
         ]);
         $result = [];
         foreach ($container as $key => $item) {
-            $result[$item] = $key;
+            if (\is_string($item)) {
+                $result[$item] = $key;
+            }
         }
 
         $this->assertArrayHasKey('secondValue', $result);
@@ -48,33 +55,33 @@ class ContainerTest extends TestCase
 
     public function testCount(): void
     {
-        $this->assertCount(5, $this->getContainer(range(1,5)));
+        $this->assertCount(5, $this->getContainer(range(1,5), false));
     }
 
     public function testResolve(): void
     {
         $container = $this->getContainer(
             [
-                Container::class => function ($c) {
+                AutoWiringInjector::class => function ($c) {
                     /** @var ContainerInterface $c */
                     return $c->get('test2');
                 },
-                'test' => Container::class,
+                'test' => AutoWiringInjector::class,
                 'test2' => function ($c) {
                     /** @var ContainerInterface $c */
-                    $factory = $c->get(ContainerFactory::class);
-                    return $factory();
+                    $factory = $c->get(AutoWiringInjectorFactory::class);
+                    return $factory($c);
                 }
             ]
         );
         $test = $container->get('test');
-        $this->assertInstanceOf(Container::class, $test);
+        $this->assertInstanceOf(AutoWiringInjector::class, $test);
 
         $container2 = $this->getContainer([
-            Container::class => ContainerFactory::class
+            DependencyInjectorInterface::class => AutoWiringInjector::class
         ]);
-        $test2 = $container2->get(Container::class);
-        $this->assertInstanceOf(Container::class, $test2);
+        $test2 = $container2->get(DependencyInjectorInterface::class);
+        $this->assertInstanceOf(AutoWiringInjector::class, $test2);
     }
 
     public function testNotFoundException(): void
@@ -88,13 +95,13 @@ class ContainerTest extends TestCase
     public function testSharedRetrieving(): Container
     {
         $container = $this->getContainer([
-                Container::class => ContainerFactory::class,
-                ContainerInterface::class => Container::class
+                AutoWiringInjector::class => AutoWiringInjectorFactory::class,
+                DependencyInjectorInterface::class => AutoWiringInjector::class
             ]
         );
 
-        $result1 = $container->get(ContainerInterface::class);
-        $result2 = $container->get(ContainerInterface::class);
+        $result1 = $container->get(DependencyInjectorInterface::class);
+        $result2 = $container->get(DependencyInjectorInterface::class);
 
         $this->assertSame($result1, $result2);
 
@@ -105,11 +112,29 @@ class ContainerTest extends TestCase
      * @depends testSharedRetrieving
      * @param Container $container
      */
-    public function testBuild(Container $container): void
+    public function testCreate(Container $container): void
     {
-        $result1 = $container->build(ContainerInterface::class);
-        $result2 = $container->build(ContainerInterface::class);
+        $result1 = $container->create(DependencyInjectorInterface::class);
+        $result2 = $container->create(DependencyInjectorInterface::class);
 
         $this->assertNotSame($result1, $result2);
+    }
+
+    public function testObjectInsteadOfArray(): void
+    {
+        $testArray = [
+            'test' => 'passed',
+            'build' => 'passed',
+            'coverage' => 100
+        ];
+        /** @var Container $container */
+        $container = new Container(new \ArrayObject($testArray));
+
+        $result = [];
+        foreach ($container as $key => $item) {
+            $result[$key] = $item;
+        }
+        $this->assertEquals($testArray, $result);
+        $this->assertCount(3, $container);
     }
 }
