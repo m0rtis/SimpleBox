@@ -20,7 +20,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     protected $data;
     /**
-     * @var DependencyInjectorInterface
+     * @var DependencyInjectorInterface|null
      */
     private $injector;
     /**
@@ -36,16 +36,20 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      * Container constructor.
      * @param iterable $data
      * @param DependencyInjectorInterface|null $injector
-     * @param bool $returnShared
      */
-    public function __construct(
-        iterable $data = [],
-        ?DependencyInjectorInterface $injector = null,
-        bool $returnShared = true
-    ) {
+    public function __construct(iterable $data = [], ?DependencyInjectorInterface $injector = null)
+    {
         $this->data = $data;
-        $this->injector = $injector ?? new Injector($this);
-        $this->returnShared = $returnShared;
+
+        $config = $data['config'][ContainerInterface::class] ?? [];
+        $this->returnShared = (bool)($config['return_shared'] ?? true);
+
+        if (!$injector && $this->has(DependencyInjectorInterface::class)) {
+            $injector = $this->get(DependencyInjectorInterface::class);
+        }
+        if ($injector instanceof DependencyInjectorInterface) {
+            $this->injector = $injector;
+        }
     }
 
     /**
@@ -89,8 +93,9 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     /**
      * @param string $id
      * @return mixed
+     * @throws ContainerException
      */
-    public function build(string $id)
+    public function create(string $id)
     {
         if (isset($this->retrieved[$id])) {
             $storeData = $this->data[$id];
@@ -127,7 +132,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     public function next(): void
     {
-        next($this->data);
+        \next($this->data);
     }
 
     /**
@@ -138,7 +143,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     public function key()
     {
-        return key($this->data);
+        return \key($this->data);
     }
 
     /**
@@ -161,7 +166,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     public function rewind(): void
     {
-        reset($this->data);
+        \reset($this->data);
     }
 
     /**
@@ -247,7 +252,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     private function canResolve(string $id): bool
     {
         $result = isset($this->data[$id]);
-        if (!$result && class_exists($id)) {
+        if ($this->injector && !$result && \class_exists($id)) {
             $result = $this->injector->canInstantiate($id);
         }
         return $result;
@@ -256,6 +261,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     /**
      * @param string $id
      * @return mixed
+     * @throws ContainerException
      */
     private function resolve(string $id)
     {
@@ -264,7 +270,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
             $resolved = $id($this);
         } elseif (isset($this->data[$id])) {
             $resolved = $this->getLazy($id);
-        } else {
+        } elseif ($this->injector) {
             $resolved = $this->injector->instantiate($id);
         }
         return $resolved;
@@ -291,7 +297,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
             } catch (\Exception $e) {
                 throw new ContainerException($e);
             }
-        } elseif ($item instanceof \Closure) {
+        } elseif (\is_callable($item)) {
             $item = $item($this);
         }
 
@@ -299,10 +305,11 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     }
 
     /**
-     * @param $id
+     * @param string $id
      * @return mixed
+     * @throws ContainerException
      */
-    private function checkRetrieved($id)
+    private function checkRetrieved(string $id)
     {
         if (!isset($this->retrieved[$id]) && isset($this->data[$id])) {
             $this->retrieved[$id] = $this->data[$id];
