@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace m0rtis\SimpleBox\Tests;
 
-
 use m0rtis\SimpleBox\AutoWiringInjectorFactory;
 use m0rtis\SimpleBox\Container;
 use m0rtis\SimpleBox\AutoWiringInjector;
 use m0rtis\SimpleBox\DependencyInjectorInterface;
+use m0rtis\SimpleBox\Tests\Mocks\ClassWithDependencies;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -55,7 +55,7 @@ class ContainerTest extends TestCase
 
     public function testCount(): void
     {
-        $this->assertCount(5, $this->getContainer(range(1,5), false));
+        $this->assertCount(5, $this->getContainer(range(1, 5), false));
     }
 
     public function testResolve(): void
@@ -96,9 +96,9 @@ class ContainerTest extends TestCase
     {
         $container = $this->getContainer([
                 AutoWiringInjector::class => AutoWiringInjectorFactory::class,
-                DependencyInjectorInterface::class => AutoWiringInjector::class
-            ]
-        );
+                DependencyInjectorInterface::class => AutoWiringInjector::class,
+                'config' => []
+            ]);
 
         $result1 = $container->get(DependencyInjectorInterface::class);
         $result2 = $container->get(DependencyInjectorInterface::class);
@@ -116,8 +116,11 @@ class ContainerTest extends TestCase
     {
         $result1 = $container->create(DependencyInjectorInterface::class);
         $result2 = $container->create(DependencyInjectorInterface::class);
-
         $this->assertNotSame($result1, $result2);
+
+        $notRetrievedObject1 = $container->create(ClassWithDependencies::class);
+        $notRetrievedObject2 = $container->create(ClassWithDependencies::class);
+        $this->assertNotSame($notRetrievedObject1, $notRetrievedObject2);
     }
 
     public function testObjectInsteadOfArray(): void

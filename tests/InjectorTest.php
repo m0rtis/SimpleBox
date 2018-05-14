@@ -10,7 +10,6 @@ use m0rtis\SimpleBox\DependencyInjectorInterface;
 use m0rtis\SimpleBox\Tests\Mocks\ClassWithDependencies;
 use PHPUnit\Framework\TestCase;
 
-
 final class InjectorTest extends TestCase
 {
     public function testGetAutowiring(): void

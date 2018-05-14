@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace m0rtis\SimpleBox;
 
-
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -253,7 +252,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     {
         $result = isset($this->data[$id]);
         if (!$result) {
-            if($this->injector && \class_exists($id)) {
+            if ($this->injector && \class_exists($id)) {
                 $result = $this->injector->canInstantiate($id);
             } else {
                 $result = $this->isCallable($id);
@@ -292,7 +291,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     {
         $item = $this->data[$id] ?? $id;
         if (\is_string($item) && $this->canResolve($item)) {
-            try{
+            try {
                 $resolved = $this->resolve($item);
                 if ($id !== $item
                     && $this->isCallable($resolved)

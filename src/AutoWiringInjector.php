@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace m0rtis\SimpleBox;
 
-
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 
@@ -60,6 +59,7 @@ final class AutoWiringInjector implements DependencyInjectorInterface
         $arguments = [];
         foreach ($deps as $name => $type) {
             if ($this->container->has($type)) {
+                /** @noinspection ExceptionsAnnotatingAndHandlingInspection */
                 $arguments[$name] = $this->container->get($type);
             } elseif ($this->container->has($name)) {
                 if ('config' === $name) {
@@ -113,6 +113,6 @@ final class AutoWiringInjector implements DependencyInjectorInterface
      */
     private function getConfigForClass($className)
     {
-
+        //TODO: Implement method
     }
 }
