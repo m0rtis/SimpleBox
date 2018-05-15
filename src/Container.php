@@ -65,9 +65,9 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     {
         if ($this->has($id)) {
             if ($this->returnShared) {
-                return $this->checkRetrieved($id);
+                return $this->getRetrieved($id);
             }
-            return $this->getLazy($id);
+            return $this->retrieve($id);
         }
 
         throw new NotFoundException($id);
@@ -86,7 +86,16 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     public function has($id): bool
     {
-        return isset($this->data[$id]) || $this->canResolve($id);
+        $id = (string)$id;
+        $result = isset($this->data[$id]);
+        if (!$result) {
+            if ($this->injector && \class_exists($id)) {
+                $result = $this->injector->canInstantiate($id);
+            } else {
+                $result = $this->isCallable($id);
+            }
+        }
+        return $result;
     }
 
     /**
@@ -107,7 +116,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
             $this->data[$id] = $storeData;
             $this->returnShared = $shared;
         } else {
-            $result = $this->getLazy($id);
+            $result = $this->retrieve($id);
         }
         return $result;
     }
@@ -246,36 +255,19 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
 
     /**
      * @param string $id
-     * @return bool
-     */
-    private function canResolve(string $id): bool
-    {
-        $result = isset($this->data[$id]);
-        if (!$result) {
-            if ($this->injector && \class_exists($id)) {
-                $result = $this->injector->canInstantiate($id);
-            } else {
-                $result = $this->isCallable($id);
-            }
-        }
-        return $result;
-    }
-
-    /**
-     * @param string $id
      * @return mixed
      * @throws ContainerException
      */
     private function resolve(string $id)
     {
-        $resolved = null;
+        $resolved = $id;
         if (\is_callable($id)) {
             $resolved = $id($this);
         } elseif ($this->isInvokable($id)) {
             $resolved = new $id();
         } elseif (isset($this->data[$id])) {
-            $resolved = $this->getLazy($id);
-        } elseif ($this->injector) {
+            $resolved = $this->retrieve($id);
+        } elseif ($this->injector && $this->injector->canInstantiate($id)) {
             $resolved = $this->injector->instantiate($id);
         }
         return $resolved;
@@ -284,14 +276,13 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     /**
      * @param string $id
      * @return mixed
-     * @throws \RuntimeException
      * @throws ContainerException
      */
-    private function getLazy(string $id)
+    private function retrieve(string $id)
     {
         $item = $this->data[$id] ?? $id;
-        if (\is_string($item) && $this->canResolve($item)) {
-            try {
+        try {
+            if (\is_string($item)) {
                 $resolved = $this->resolve($item);
                 if ($id !== $item
                     && $this->isCallable($resolved)
@@ -300,12 +291,13 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
                     $resolved = $this->call($resolved);
                 }
                 $item = $resolved;
-            } catch (\Exception $e) {
-                throw new ContainerException($e);
+            } elseif (\is_callable($item)) {
+                $item = $this->call($item);
             }
-        } elseif (\is_callable($item)) {
-            $item = $this->call($item);
+        } catch (\Exception $e) {
+            throw new ContainerException($e);
         }
+
         return $item;
     }
 
@@ -314,12 +306,12 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      * @return mixed
      * @throws ContainerException
      */
-    private function checkRetrieved(string $id)
+    private function getRetrieved(string $id)
     {
         if (!isset($this->retrieved[$id]) && isset($this->data[$id])) {
             $this->retrieved[$id] = $this->data[$id];
         }
-        $this->data[$id] = $this->getLazy($id);
+        $this->data[$id] = $this->retrieve($id);
         return $this->data[$id];
     }
 
