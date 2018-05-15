@@ -36,12 +36,14 @@ final class AutoWiringInjector implements DependencyInjectorInterface
     {
         $answer = false;
         $container = $this->container;
-        $constructor = (new \ReflectionClass($className))->getConstructor();
-        $deps = \array_filter($this->getDependencies($constructor), function ($name, $type) use ($container) {
-            return !($container->has($type) || $container->has($name));
-        }, ARRAY_FILTER_USE_BOTH);
-        if (empty($deps)) {
-            $answer = true;
+        if (\class_exists($className)) {
+            $constructor = (new \ReflectionClass($className))->getConstructor();
+            $deps = \array_filter($this->getDependencies($constructor), function ($name, $type) use ($container) {
+                return !($container->has($type) || $container->has($name));
+            }, ARRAY_FILTER_USE_BOTH);
+            if (empty($deps)) {
+                $answer = true;
+            }
         }
 
         return $answer;
@@ -50,6 +52,8 @@ final class AutoWiringInjector implements DependencyInjectorInterface
     /**
      * @param string $className
      * @return object
+     * @throws \Psr\Container\NotFoundExceptionInterface
+     * @throws \Psr\Container\ContainerExceptionInterface
      * @throws \ReflectionException
      */
     public function instantiate(string $className): object
@@ -63,7 +67,7 @@ final class AutoWiringInjector implements DependencyInjectorInterface
                 $arguments[$name] = $this->container->get($type);
             } elseif ($this->container->has($name)) {
                 if ('config' === $name) {
-                    $config = $this->container->get('config');
+                    $config = $this->getConfigForClass($reflect, $this->container->get('config'));
                     $arguments[$name] = $config[$name] ?? $config;
                 } else {
                     $arguments[$name] = $this->container->get($name);
@@ -107,12 +111,23 @@ final class AutoWiringInjector implements DependencyInjectorInterface
     }
 
     /**
-     * @param $className
+     * @param \ReflectionClass $class
+     * @param iterable $config
      * @return mixed
-     * @throws ContainerExceptionInterface
      */
-    private function getConfigForClass($className)
+    private function getConfigForClass(\ReflectionClass $class, iterable $config): iterable
     {
-        //TODO: Implement method
+        if (isset($config[$class->getName()])) {
+            $config = $config[$class->getName()];
+        } else {
+            foreach ($class->getInterfaceNames() as $interfaceName) {
+                if (isset($config[$interfaceName])) {
+                    $config = $config[$interfaceName];
+                    continue;
+                }
+            }
+        }
+
+        return $config;
     }
 }
