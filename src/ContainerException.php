@@ -15,15 +15,19 @@ final class ContainerException extends \RuntimeException implements ContainerExc
     /**
      * ContainerException constructor.
      * @param \Exception $previousException
+     * @param int $code
      */
-    public function __construct(\Exception $previousException)
+    public function __construct(\Exception $previousException, int $code = 0)
     {
         $exceptionClass = \get_class($previousException);
+        $trace = $previousException->getTrace();
         $message = \sprintf(
-            'Exception %s has thrown with message: %s',
+            'Exception %s has thrown by %s::%s with message: %s',
             $exceptionClass,
+            $trace[0]['class'],
+            $trace[0]['function'],
             $previousException->getMessage()
         );
-        parent::__construct($message);
+        parent::__construct($message, $code, $previousException);
     }
 }
