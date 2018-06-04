@@ -6,12 +6,13 @@ namespace m0rtis\SimpleBox;
 
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
+use Psr\Container\NotFoundExceptionInterface;
 
 /**
- * Class AutoWiringInjector
+ * Class Injector
  * @package m0rtis\SimpleBox
  */
-final class AutoWiringInjector implements DependencyInjectorInterface
+final class Injector implements DependencyInjectorInterface
 {
     /**
      * @var ContainerInterface
@@ -19,7 +20,7 @@ final class AutoWiringInjector implements DependencyInjectorInterface
     private $container;
 
     /**
-     * AutoWiringInjector constructor.
+     * Injector constructor.
      * @param ContainerInterface $container
      */
     public function __construct(ContainerInterface $container)
@@ -52,8 +53,8 @@ final class AutoWiringInjector implements DependencyInjectorInterface
     /**
      * @param string $className
      * @return object
-     * @throws \Psr\Container\NotFoundExceptionInterface
-     * @throws \Psr\Container\ContainerExceptionInterface
+     * @throws NotFoundExceptionInterface
+     * @throws ContainerExceptionInterface
      * @throws \ReflectionException
      */
     public function instantiate(string $className): object

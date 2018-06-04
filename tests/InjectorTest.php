@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace m0rtis\SimpleBox\Tests;
 
-use m0rtis\SimpleBox\AutoWiringInjectorFactory;
+use m0rtis\SimpleBox\InjectorFactory;
 use m0rtis\SimpleBox\Container;
 use m0rtis\SimpleBox\DependencyInjectorInterface;
 use m0rtis\SimpleBox\Tests\Mocks\ClassWithDependencies;
@@ -18,7 +18,7 @@ final class InjectorTest extends TestCase
             'config' => [
                 'testKey' => 'testValue'
             ],
-            DependencyInjectorInterface::class => AutoWiringInjectorFactory::class
+            DependencyInjectorInterface::class => InjectorFactory::class
         ]);
         /** @var ClassWithDependencies $result */
         $result = $container->get(ClassWithDependencies::class);

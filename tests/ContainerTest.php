@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace m0rtis\SimpleBox\Tests;
 
-use m0rtis\SimpleBox\AutoWiringInjectorFactory;
+use m0rtis\SimpleBox\InjectorFactory;
 use m0rtis\SimpleBox\Container;
-use m0rtis\SimpleBox\AutoWiringInjector;
+use m0rtis\SimpleBox\Injector;
 use m0rtis\SimpleBox\DependencyInjectorInterface;
 use m0rtis\SimpleBox\Tests\Mocks\ClassWithDependencies;
 use PHPUnit\Framework\TestCase;
@@ -18,12 +18,12 @@ class ContainerTest extends TestCase
     protected function getContainer(iterable $data = [], bool $di = true): Container
     {
         if ($di) {
-            $data[DependencyInjectorInterface::class] = AutoWiringInjectorFactory::class;
+            $data[DependencyInjectorInterface::class] = InjectorFactory::class;
         }
         return new Container($data);
     }
 
-    public function testOffsetMethods(): void
+    public function testArrayAccessMethods(): void
     {
         $container = $this->getContainer(['testKey' => 'testValue']);
         $this->assertArrayHasKey('testKey', $container);
@@ -62,26 +62,26 @@ class ContainerTest extends TestCase
     {
         $container = $this->getContainer(
             [
-                AutoWiringInjector::class => function ($c) {
+                Injector::class => function ($c) {
                     /** @var ContainerInterface $c */
                     return $c->get('test2');
                 },
-                'test' => AutoWiringInjector::class,
+                'test' => Injector::class,
                 'test2' => function ($c) {
                     /** @var ContainerInterface $c */
-                    $factory = $c->get(AutoWiringInjectorFactory::class);
+                    $factory = $c->get(InjectorFactory::class);
                     return $factory($c);
                 }
             ]
         );
         $test = $container->get('test');
-        $this->assertInstanceOf(AutoWiringInjector::class, $test);
+        $this->assertInstanceOf(Injector::class, $test);
 
         $container2 = $this->getContainer([
-            DependencyInjectorInterface::class => AutoWiringInjector::class
+            DependencyInjectorInterface::class => Injector::class
         ]);
         $test2 = $container2->get(DependencyInjectorInterface::class);
-        $this->assertInstanceOf(AutoWiringInjector::class, $test2);
+        $this->assertInstanceOf(Injector::class, $test2);
     }
 
     public function testNotFoundException(): void
@@ -95,8 +95,8 @@ class ContainerTest extends TestCase
     public function testSharedRetrieving(): Container
     {
         $container = $this->getContainer([
-                AutoWiringInjector::class => AutoWiringInjectorFactory::class,
-                DependencyInjectorInterface::class => AutoWiringInjector::class,
+                Injector::class => InjectorFactory::class,
+                DependencyInjectorInterface::class => Injector::class,
                 'config' => []
             ]);
 
