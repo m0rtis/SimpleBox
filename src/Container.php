@@ -19,10 +19,6 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     protected $data;
     /**
-     * @var DependencyInjectorInterface|null
-     */
-    private $injector;
-    /**
      * @var bool
      */
     private $returnShared;
@@ -34,21 +30,13 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     /**
      * Container constructor.
      * @param iterable $data
-     * @param DependencyInjectorInterface|null $injector
      */
-    public function __construct(iterable $data = [], ?DependencyInjectorInterface $injector = null)
+    public function __construct(iterable $data = [])
     {
         $this->data = $data;
 
         $config = $data['config'][ContainerInterface::class] ?? [];
         $this->returnShared = (bool)($config['return_shared'] ?? true);
-
-        if (!$injector && $this->has(DependencyInjectorInterface::class)) {
-            $injector = $this->get(DependencyInjectorInterface::class);
-        }
-        if ($injector instanceof DependencyInjectorInterface) {
-            $this->injector = $injector;
-        }
     }
 
     /**
@@ -88,12 +76,8 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     {
         $id = (string)$id;
         $result = isset($this->data[$id]);
-        if (!$result) {
-            if ($this->injector && \class_exists($id)) {
-                $result = $this->injector->canInstantiate($id);
-            } else {
-                $result = $this->isCallable($id);
-            }
+        if (!$result && !($result = $this->isCallable($id)) && \class_exists($id)) {
+            $result = $this->canInstantiate($id);
         }
         return $result;
     }
@@ -254,6 +238,27 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     }
 
     /**
+     * @param string $className
+     * @return bool
+     */
+    protected function canInstantiate(string $className): bool
+    {
+        /**
+         * Can be overridden in child classes
+         */
+        return false;
+    }
+
+    /**
+     * @param string $className
+     * @return object
+     */
+    protected function instantiate(string $className): object
+    {
+        throw new \RuntimeException('Method Container::instantiate is not allowed and should be overridden');
+    }
+
+    /**
      * @param string $id
      * @return mixed
      * @throws ContainerException
@@ -263,12 +268,10 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
         $resolved = $id;
         if (\is_callable($id)) {
             $resolved = $id($this);
-        } elseif ($this->isInvokable($id)) {
-            $resolved = new $id();
         } elseif (isset($this->data[$id])) {
             $resolved = $this->retrieve($id);
-        } elseif ($this->injector && $this->injector->canInstantiate($id)) {
-            $resolved = $this->injector->instantiate($id);
+        } elseif ($this->canInstantiate($id)) {
+            $resolved = $this->instantiate($id);
         }
         return $resolved;
     }
@@ -284,8 +287,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
         try {
             if (\is_string($item)) {
                 $resolved = $this->resolve($item);
-                if ($id !== $item
-                    && $this->isCallable($resolved)
+                if ($this->isCallable($resolved)
                     && false !== \stripos($item, 'factory')
                 ) {
                     $resolved = $this->call($resolved);
@@ -321,11 +323,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     private function isCallable($var): bool
     {
-        $result = \is_callable($var);
-        if (!$result && \is_string($var) && $this->isInvokable($var)) {
-            $result = true;
-        }
-        return $result;
+        return \is_callable($var) || (\is_string($var) && $this->isInvokable($var));
     }
 
     /**

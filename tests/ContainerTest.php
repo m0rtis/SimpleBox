@@ -4,22 +4,20 @@ declare(strict_types=1);
 
 namespace m0rtis\SimpleBox\Tests;
 
-use m0rtis\SimpleBox\InjectorFactory;
 use m0rtis\SimpleBox\Container;
-use m0rtis\SimpleBox\Injector;
-use m0rtis\SimpleBox\DependencyInjectorInterface;
+use m0rtis\SimpleBox\ContainerException;
 use m0rtis\SimpleBox\Tests\Mocks\ClassWithDependencies;
+use m0rtis\SimpleBox\Tests\Mocks\DependencyOne;
+use m0rtis\SimpleBox\Tests\Mocks\DependencyTwo;
+use m0rtis\SimpleBox\Tests\Mocks\DependencyTwoFactory;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
 
 class ContainerTest extends TestCase
 {
-    protected function getContainer(iterable $data = [], bool $di = true): Container
+    protected function getContainer(iterable $data = []): Container
     {
-        if ($di) {
-            $data[DependencyInjectorInterface::class] = InjectorFactory::class;
-        }
         return new Container($data);
     }
 
@@ -55,33 +53,49 @@ class ContainerTest extends TestCase
 
     public function testCount(): void
     {
-        $this->assertCount(5, $this->getContainer(range(1, 5), false));
+        $this->assertCount(5, $this->getContainer(range(1, 5)));
     }
 
     public function testResolve(): void
     {
         $container = $this->getContainer(
             [
-                Injector::class => function ($c) {
+                'test' => ClassWithDependencies::class,
+                ClassWithDependencies::class => function ($c) {
                     /** @var ContainerInterface $c */
-                    return $c->get('test2');
+                    return new ClassWithDependencies($c->get(DependencyOne::class), []);
                 },
-                'test' => Injector::class,
-                'test2' => function ($c) {
+                DependencyOne::class => function ($c) {
                     /** @var ContainerInterface $c */
-                    $factory = $c->get(InjectorFactory::class);
-                    return $factory($c);
-                }
+                    return new DependencyOne($c->get(DependencyTwoFactory::class), $c);
+                },
+                DependencyTwoFactory::class => DependencyTwoFactory::class.'::getInstance'
             ]
         );
         $test = $container->get('test');
-        $this->assertInstanceOf(Injector::class, $test);
 
-        $container2 = $this->getContainer([
-            DependencyInjectorInterface::class => Injector::class
-        ]);
-        $test2 = $container2->get(DependencyInjectorInterface::class);
-        $this->assertInstanceOf(Injector::class, $test2);
+        $this->assertInstanceOf(ClassWithDependencies::class, $test);
+    }
+
+    public function testCall(): void
+    {
+        $container = $this->getContainer();
+        $result = $container->get(DependencyTwoFactory::class);
+
+        $this->assertInstanceOf(DependencyTwo::class, $result);
+    }
+
+    public function testContainerException(): void
+    {
+        $container = new class extends Container {
+            protected function canInstantiate(string $className): bool
+            {
+                return true;
+            }
+        };
+
+        $this->expectException(ContainerException::class);
+        $container->get(DependencyTwo::class);
     }
 
     public function testNotFoundException(): void
@@ -95,13 +109,11 @@ class ContainerTest extends TestCase
     public function testSharedRetrieving(): Container
     {
         $container = $this->getContainer([
-                Injector::class => InjectorFactory::class,
-                DependencyInjectorInterface::class => Injector::class,
-                'config' => []
+                DependencyTwo::class => DependencyTwoFactory::class
             ]);
 
-        $result1 = $container->get(DependencyInjectorInterface::class);
-        $result2 = $container->get(DependencyInjectorInterface::class);
+        $result1 = $container->get(DependencyTwo::class);
+        $result2 = $container->get(DependencyTwo::class);
 
         $this->assertSame($result1, $result2);
 
@@ -114,13 +126,13 @@ class ContainerTest extends TestCase
      */
     public function testCreate(Container $container): void
     {
-        $result1 = $container->create(DependencyInjectorInterface::class);
-        $result2 = $container->create(DependencyInjectorInterface::class);
+        $result1 = $container->create(DependencyTwo::class);
+        $result2 = $container->create(DependencyTwo::class);
         $this->assertNotSame($result1, $result2);
 
-        $notRetrievedObject1 = $container->create(ClassWithDependencies::class);
-        $notRetrievedObject2 = $container->create(ClassWithDependencies::class);
-        $this->assertNotSame($notRetrievedObject1, $notRetrievedObject2);
+        $result3 = $container->create(DependencyTwoFactory::class);
+        $result4 = $container->create(DependencyTwoFactory::class);
+        $this->assertNotSame($result3, $result4);
     }
 
     public function testObjectInsteadOfArray(): void

@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace m0rtis\SimpleBox\Tests;
 
-use m0rtis\SimpleBox\InjectorFactory;
-use m0rtis\SimpleBox\Container;
-use m0rtis\SimpleBox\DependencyInjectorInterface;
+use m0rtis\SimpleBox\AutowiringContainer;
 use m0rtis\SimpleBox\Tests\Mocks\ClassWithDependencies;
+use m0rtis\SimpleBox\Tests\Mocks\TestInterface;
 use PHPUnit\Framework\TestCase;
 
-final class InjectorTest extends TestCase
+final class AutowiringContainerTest extends TestCase
 {
     public function testGetAutowiring(): void
     {
-        $container = new Container([
+        $container = new AutowiringContainer([
             'config' => [
-                'testKey' => 'testValue'
-            ],
-            DependencyInjectorInterface::class => InjectorFactory::class
+                TestInterface::class => [
+                    'testKey' => 'testValue'
+                ]
+            ]
         ]);
         /** @var ClassWithDependencies $result */
         $result = $container->get(ClassWithDependencies::class);

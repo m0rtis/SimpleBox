@@ -4,48 +4,31 @@ declare(strict_types=1);
 
 namespace m0rtis\SimpleBox;
 
-use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
-use Psr\Container\NotFoundExceptionInterface;
 
 /**
- * Class Injector
+ * Class AutowiringContainer
  * @package m0rtis\SimpleBox
  */
-final class Injector implements DependencyInjectorInterface
+class AutowiringContainer extends Container
 {
-    /**
-     * @var ContainerInterface
-     */
-    private $container;
-
-    /**
-     * Injector constructor.
-     * @param ContainerInterface $container
-     */
-    public function __construct(ContainerInterface $container)
-    {
-        $this->container = $container;
-    }
-
     /**
      * @param string $className
      * @return bool
      * @throws \ReflectionException
      */
-    public function canInstantiate(string $className): bool
+    protected function canInstantiate(string $className): bool
     {
         $answer = false;
-        $container = $this->container;
-        if (\class_exists($className)) {
-            $constructor = (new \ReflectionClass($className))->getConstructor();
-            $deps = \array_filter($this->getDependencies($constructor), function ($name, $type) use ($container) {
-                return !($container->has($type) || $container->has($name));
-            }, ARRAY_FILTER_USE_BOTH);
-            if (empty($deps)) {
-                $answer = true;
-            }
+        $container = $this;
+        $constructor = (new \ReflectionClass($className))->getConstructor();
+        $deps = \array_filter($this->getDependencies($constructor), function ($type, $name) use ($container) {
+            return !($container->has($type) || $container->has($name) || ContainerInterface::class === $type);
+        }, ARRAY_FILTER_USE_BOTH);
+        if (\count($deps) === 0) {
+            $answer = true;
         }
+
 
         return $answer;
     }
@@ -53,28 +36,25 @@ final class Injector implements DependencyInjectorInterface
     /**
      * @param string $className
      * @return object
-     * @throws NotFoundExceptionInterface
-     * @throws ContainerExceptionInterface
      * @throws \ReflectionException
      */
-    public function instantiate(string $className): object
+    protected function instantiate(string $className): object
     {
         $reflect = new \ReflectionClass($className);
         $deps = $this->getDependencies($reflect->getConstructor());
         $arguments = [];
         foreach ($deps as $name => $type) {
-            if ($this->container->has($type)) {
-                /** @noinspection ExceptionsAnnotatingAndHandlingInspection */
-                $arguments[$name] = $this->container->get($type);
-            } elseif ($this->container->has($name)) {
+            if ($this->has($type)) {
+                $arguments[$name] = $this->get($type);
+            } elseif ($this->has($name)) {
                 if ('config' === $name) {
-                    $config = $this->getConfigForClass($reflect, $this->container->get('config'));
+                    $config = $this->getConfigForClass($reflect, $this->get('config'));
                     $arguments[$name] = $config[$name] ?? $config;
                 } else {
-                    $arguments[$name] = $this->container->get($name);
+                    $arguments[$name] = $this->get($name);
                 }
             } elseif (ContainerInterface::class === $type) {
-                $arguments[$name] = $this->container;
+                $arguments[$name] = $this;
             }
         }
         return $reflect->newInstanceArgs($arguments);
@@ -124,7 +104,7 @@ final class Injector implements DependencyInjectorInterface
             foreach ($class->getInterfaceNames() as $interfaceName) {
                 if (isset($config[$interfaceName])) {
                     $config = $config[$interfaceName];
-                    continue;
+                    break;
                 }
             }
         }
