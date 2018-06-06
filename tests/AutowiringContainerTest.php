@@ -6,6 +6,7 @@ namespace m0rtis\SimpleBox\Tests;
 
 use m0rtis\SimpleBox\AutowiringContainer;
 use m0rtis\SimpleBox\Tests\Mocks\ClassWithDependencies;
+use m0rtis\SimpleBox\Tests\Mocks\TestInterface;
 use PHPUnit\Framework\TestCase;
 
 final class AutowiringContainerTest extends TestCase
@@ -14,7 +15,9 @@ final class AutowiringContainerTest extends TestCase
     {
         $container = new AutowiringContainer([
             'config' => [
-                'testKey' => 'testValue'
+                TestInterface::class => [
+                    'testKey' => 'testValue'
+                ]
             ]
         ]);
         /** @var ClassWithDependencies $result */

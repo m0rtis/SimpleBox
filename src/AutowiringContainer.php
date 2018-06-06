@@ -22,8 +22,8 @@ class AutowiringContainer extends Container
         $answer = false;
         $container = $this;
         $constructor = (new \ReflectionClass($className))->getConstructor();
-        $deps = \array_filter($this->getDependencies($constructor), function ($name, $type) use ($container) {
-            return !($container->has($type) || $container->has($name));
+        $deps = \array_filter($this->getDependencies($constructor), function ($type, $name) use ($container) {
+            return !($container->has($type) || $container->has($name) || ContainerInterface::class === $type);
         }, ARRAY_FILTER_USE_BOTH);
         if (\count($deps) === 0) {
             $answer = true;
@@ -104,7 +104,7 @@ class AutowiringContainer extends Container
             foreach ($class->getInterfaceNames() as $interfaceName) {
                 if (isset($config[$interfaceName])) {
                     $config = $config[$interfaceName];
-                    continue;
+                    break;
                 }
             }
         }

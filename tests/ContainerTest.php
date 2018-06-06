@@ -67,7 +67,7 @@ class ContainerTest extends TestCase
                 },
                 DependencyOne::class => function ($c) {
                     /** @var ContainerInterface $c */
-                    return new DependencyOne($c->get(DependencyTwoFactory::class));
+                    return new DependencyOne($c->get(DependencyTwoFactory::class), $c);
                 },
                 DependencyTwoFactory::class => DependencyTwoFactory::class.'::getInstance'
             ]
@@ -75,6 +75,14 @@ class ContainerTest extends TestCase
         $test = $container->get('test');
 
         $this->assertInstanceOf(ClassWithDependencies::class, $test);
+    }
+
+    public function testCall(): void
+    {
+        $container = $this->getContainer();
+        $result = $container->get(DependencyTwoFactory::class);
+
+        $this->assertInstanceOf(DependencyTwo::class, $result);
     }
 
     public function testContainerException(): void
@@ -87,7 +95,7 @@ class ContainerTest extends TestCase
         };
 
         $this->expectException(ContainerException::class);
-        $container->get(DependencyTwoFactory::class);
+        $container->get(DependencyTwo::class);
     }
 
     public function testNotFoundException(): void

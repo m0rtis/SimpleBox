@@ -268,8 +268,6 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
         $resolved = $id;
         if (\is_callable($id)) {
             $resolved = $id($this);
-        } elseif ($this->isInvokable($id)) {
-            $resolved = new $id();
         } elseif (isset($this->data[$id])) {
             $resolved = $this->retrieve($id);
         } elseif ($this->canInstantiate($id)) {
@@ -289,8 +287,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
         try {
             if (\is_string($item)) {
                 $resolved = $this->resolve($item);
-                if ($resolved !== $item
-                    && $this->isCallable($resolved)
+                if ($this->isCallable($resolved)
                     && false !== \stripos($item, 'factory')
                 ) {
                     $resolved = $this->call($resolved);
