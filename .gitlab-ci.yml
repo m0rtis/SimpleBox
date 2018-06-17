@@ -11,7 +11,7 @@ before_script:
 - apt-get update -yqq
 - apt-get install -yqq git libmcrypt-dev libpq-dev libcurl4-gnutls-dev libicu-dev libxml2-dev libexpat1-dev libbz2-dev
 # Install PHP extensions
-- docker-php-ext-install mbstring curl json intl xml bz2 opcache
+- docker-php-ext-install mbstring curl json intl xmlK bz2 opcache
 # Install & enable Xdebug for code coverage reports
 - pecl install xdebug
 - docker-php-ext-enable xdebug
