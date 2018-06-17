@@ -21,10 +21,7 @@ before_script:
 
 # Run our tests
 # If Xdebug was installed you can generate a coverage report and see code coverage metrics.
+
 test:
   script:
-  - php composer.phar test
-
-build:
-  script:
-  - php composer.phar build
+  - php composer.phar check

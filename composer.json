@@ -36,7 +36,7 @@
     },
     "prefer-stable": true,
     "scripts": {
-        "build": [
+        "check": [
             "@cs",
             "@test"
         ],
