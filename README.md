@@ -122,7 +122,6 @@ $container['serviceName'] = function (ContainerInterface $c) {
 The `__invoke` method should accept a `Psr\Container\ContainerInterface` as only argument:
 ```php
 $container['serviceName'] = ServiceFactory::class;
-
 class ServiceFactory
 {
     public function __invoke(ContainerInterface $c)
