@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace m0rtis\SimpleBox;
 
-
 use Psr\Container\ContainerExceptionInterface;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -20,10 +19,6 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     protected $data;
     /**
-     * @var DependencyInjectorInterface
-     */
-    private $injector;
-    /**
      * @var bool
      */
     private $returnShared;
@@ -35,17 +30,13 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     /**
      * Container constructor.
      * @param iterable $data
-     * @param DependencyInjectorInterface|null $injector
-     * @param bool $returnShared
      */
-    public function __construct(
-        iterable $data = [],
-        ?DependencyInjectorInterface $injector = null,
-        bool $returnShared = true
-    ) {
+    public function __construct(iterable $data = [])
+    {
         $this->data = $data;
-        $this->injector = $injector ?? new Injector($this);
-        $this->returnShared = $returnShared;
+
+        $config = $data['config'][ContainerInterface::class] ?? [];
+        $this->returnShared = (bool)($config['return_shared'] ?? true);
     }
 
     /**
@@ -62,9 +53,9 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     {
         if ($this->has($id)) {
             if ($this->returnShared) {
-                return $this->checkRetrieved($id);
+                return $this->getRetrieved($id);
             }
-            return $this->getLazy($id);
+            return $this->retrieve($id);
         }
 
         throw new NotFoundException($id);
@@ -83,14 +74,18 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     public function has($id): bool
     {
-        return isset($this->data[$id]) || $this->canResolve($id);
+        $id = (string)$id;
+        return  isset($this->data[$id])
+                ?: $this->isCallable($id)
+                ?: (\class_exists($id) && $this->canInstantiate($id));
     }
 
     /**
      * @param string $id
      * @return mixed
+     * @throws ContainerException
      */
-    public function build(string $id)
+    public function create(string $id)
     {
         if (isset($this->retrieved[$id])) {
             $storeData = $this->data[$id];
@@ -103,7 +98,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
             $this->data[$id] = $storeData;
             $this->returnShared = $shared;
         } else {
-            $result = $this->getLazy($id);
+            $result = $this->retrieve($id);
         }
         return $result;
     }
@@ -127,7 +122,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     public function next(): void
     {
-        next($this->data);
+        \next($this->data);
     }
 
     /**
@@ -138,7 +133,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     public function key()
     {
-        return key($this->data);
+        return \key($this->data);
     }
 
     /**
@@ -161,7 +156,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      */
     public function rewind(): void
     {
-        reset($this->data);
+        \reset($this->data);
     }
 
     /**
@@ -241,31 +236,40 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     }
 
     /**
-     * @param string $id
+     * @param string $className
      * @return bool
      */
-    private function canResolve(string $id): bool
+    protected function canInstantiate(string $className): bool
     {
-        $result = isset($this->data[$id]);
-        if (!$result && class_exists($id)) {
-            $result = $this->injector->canInstantiate($id);
-        }
-        return $result;
+        /**
+         * Can be overridden in child classes
+         */
+        return false;
+    }
+
+    /**
+     * @param string $className
+     * @return object
+     */
+    protected function instantiate(string $className): object
+    {
+        throw new \RuntimeException('Method Container::instantiate is not allowed and should be overridden');
     }
 
     /**
      * @param string $id
      * @return mixed
+     * @throws ContainerException
      */
     private function resolve(string $id)
     {
-        $resolved = null;
+        $resolved = $id;
         if (\is_callable($id)) {
             $resolved = $id($this);
         } elseif (isset($this->data[$id])) {
-            $resolved = $this->getLazy($id);
-        } else {
-            $resolved = $this->injector->instantiate($id);
+            $resolved = $this->retrieve($id);
+        } elseif ($this->canInstantiate($id)) {
+            $resolved = $this->instantiate($id);
         }
         return $resolved;
     }
@@ -275,39 +279,79 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
      * @return mixed
      * @throws ContainerException
      */
-    private function getLazy(string $id)
+    private function retrieve(string $id)
     {
         $item = $this->data[$id] ?? $id;
-        if (\is_string($item) && $this->canResolve($item)) {
-            try{
+        try {
+            if (\is_string($item)) {
                 $resolved = $this->resolve($item);
-                if ($id !== $item
-                    && \is_callable($resolved)
+                if ($this->isCallable($resolved)
                     && false !== \stripos($item, 'factory')
                 ) {
-                    $resolved = $resolved($this);
+                    $resolved = $this->call($resolved);
                 }
                 $item = $resolved;
-            } catch (\Exception $e) {
-                throw new ContainerException($e);
+            } elseif (\is_callable($item)) {
+                $item = $this->call($item);
             }
-        } elseif ($item instanceof \Closure) {
-            $item = $item($this);
+        } catch (\Exception $e) {
+            throw new ContainerException($e);
         }
 
         return $item;
     }
 
     /**
-     * @param $id
+     * @param string $id
      * @return mixed
+     * @throws ContainerException
      */
-    private function checkRetrieved($id)
+    private function getRetrieved(string $id)
     {
         if (!isset($this->retrieved[$id]) && isset($this->data[$id])) {
             $this->retrieved[$id] = $this->data[$id];
         }
-        $this->data[$id] = $this->getLazy($id);
+        $this->data[$id] = $this->retrieve($id);
         return $this->data[$id];
+    }
+
+    /**
+     * @param mixed $var
+     * @return bool
+     */
+    private function isCallable($var): bool
+    {
+        return \is_callable($var) || (\is_string($var) && $this->isInvokable($var));
+    }
+
+    /**
+     * @param $callable
+     * @return mixed
+     * @throws \RuntimeException
+     */
+    private function call($callable)
+    {
+        if (\is_callable($callable)) {
+            $result = $callable($this);
+        } elseif (\is_string($callable) && $this->isInvokable($callable)) {
+            $result = (new $callable())($this);
+        } else {
+            throw new \RuntimeException(
+                sprintf(
+                    'Unable to call. The type of given callable is %s',
+                    \gettype($callable)
+                )
+            );
+        }
+        return $result;
+    }
+
+    /**
+     * @param string $class
+     * @return bool
+     */
+    private function isInvokable(string $class): bool
+    {
+        return \class_exists($class) && \method_exists($class, '__invoke');
     }
 }
