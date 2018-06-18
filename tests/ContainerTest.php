@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace m0rtis\SimpleBox\Tests;
 
+use m0rtis\Picklock\Picklock;
 use m0rtis\SimpleBox\Container;
 use m0rtis\SimpleBox\ContainerException;
 use m0rtis\SimpleBox\Tests\Mocks\ClassWithDependencies;
@@ -56,6 +57,25 @@ class ContainerTest extends TestCase
         $this->assertCount(5, $this->getContainer(range(1, 5)));
     }
 
+    public function hasDataProvider(): iterable
+    {
+        yield ['testKey', false];
+        yield [ContainerInterface::class, $this->getContainer()];
+        yield [ClassWithDependencies::class, 'testPassed'];
+    }
+
+    /**
+     * @dataProvider hasDataProvider
+     * @param string $key
+     * @param $value
+     */
+    public function testHas(string $key, $value): void
+    {
+        $container = $this->getContainer([$key => $value]);
+
+        $this->assertTrue($container->has($key));
+    }
+
     public function testResolve(): void
     {
         $container = $this->getContainer(
@@ -81,8 +101,11 @@ class ContainerTest extends TestCase
     {
         $container = $this->getContainer();
         $result = $container->get(DependencyTwoFactory::class);
-
         $this->assertInstanceOf(DependencyTwo::class, $result);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Unable to call. The type of given callable is boolean');
+        Picklock::callMethod($container, 'call', true);
     }
 
     public function testContainerException(): void
