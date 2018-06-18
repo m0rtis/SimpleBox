@@ -13,42 +13,46 @@ use Psr\Container\ContainerInterface;
 class AutowiringContainer extends Container
 {
     /**
+     * @var array
+     */
+    private $reflections = [];
+    /**
      * @param string $className
      * @return bool
-     * @throws \ReflectionException
      */
     protected function canInstantiate(string $className): bool
     {
         $answer = false;
-        $container = $this;
-        $constructor = (new \ReflectionClass($className))->getConstructor();
-        $deps = \array_filter($this->getDependencies($constructor), function ($type, $name) use ($container) {
-            return !($container->has($type) || $container->has($name) || ContainerInterface::class === $type);
-        }, ARRAY_FILTER_USE_BOTH);
-        if (\count($deps) === 0) {
-            $answer = true;
+        if (\class_exists($className)) {
+            $container = $this;
+            $constructor = $this->getReflection($className)->getConstructor();
+            $deps = \array_filter($this->getDependencies($constructor), function ($type, $name) use ($container) {
+                return !($container->has($type) || $container->has($name) || ContainerInterface::class === $type);
+            }, ARRAY_FILTER_USE_BOTH);
+            if (\count($deps) === 0) {
+                $answer = true;
+            }
         }
-
 
         return $answer;
     }
 
     /**
      * @param string $className
+     * @throws \InvalidArgumentException
      * @return object
-     * @throws \ReflectionException
      */
     protected function instantiate(string $className): object
     {
-        $reflect = new \ReflectionClass($className);
-        $deps = $this->getDependencies($reflect->getConstructor());
+        $reflection = $this->getReflection($className);
+        $deps = $this->getDependencies($reflection->getConstructor());
         $arguments = [];
         foreach ($deps as $name => $type) {
             if ($this->has($type)) {
                 $arguments[$name] = $this->get($type);
             } elseif ($this->has($name)) {
                 if ('config' === $name) {
-                    $config = $this->getConfigForClass($reflect, $this->get('config'));
+                    $config = $this->getConfigForClass($reflection, $this->get('config'));
                     $arguments[$name] = $config[$name] ?? $config;
                 } else {
                     $arguments[$name] = $this->get($name);
@@ -57,7 +61,34 @@ class AutowiringContainer extends Container
                 $arguments[$name] = $this;
             }
         }
-        return $reflect->newInstanceArgs($arguments);
+        return $this->getInstance($reflection, $arguments);
+    }
+
+    /**
+     * @param string $className
+     * @return \ReflectionClass
+     * @throws \InvalidArgumentException
+     */
+    private function getReflection(string $className): \ReflectionClass
+    {
+        if (!\class_exists($className)) {
+            throw new \InvalidArgumentException("Class $className does not exists");
+        }
+        return $this->reflections[$className] ?? $this->reflections[$className] = new \ReflectionClass($className);
+    }
+
+    /**
+     * @param \ReflectionClass $reflection
+     * @param array $arguments
+     * @return object
+     */
+    private function getInstance(\ReflectionClass $reflection, array $arguments): object
+    {
+        $object = $reflection->newInstanceArgs($arguments);
+        if (isset($this->reflections[$reflection->getName()])) {
+            unset($this->reflections[$reflection->getName()]);
+        }
+        return $object;
     }
 
     /**
