@@ -35,7 +35,8 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     {
         $this->data = $data;
 
-        $this->returnShared = (bool)($data['config'][ContainerInterface::class]['return_shared'] ?? true);
+        $config = $data['config'][ContainerInterface::class] ?? [];
+        $this->returnShared = (bool)($config['return_shared'] ?? true);
     }
 
     /**
@@ -283,9 +284,14 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
         $item = $this->data[$id] ?? $id;
         try {
             if (\is_string($item)) {
-                $item = $this->resolve($item);
-            }
-            if ($this->isCallable($item)) {
+                $resolved = $this->resolve($item);
+                if ($this->isCallable($resolved)
+                    && false !== \stripos($item, 'factory')
+                ) {
+                    $resolved = $this->call($resolved);
+                }
+                $item = $resolved;
+            } elseif (\is_callable($item)) {
                 $item = $this->call($item);
             }
         } catch (\Exception $e) {
