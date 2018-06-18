@@ -285,10 +285,12 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
         try {
             if (\is_string($item)) {
                 $resolved = $this->resolve($item);
-                if ($this->isCallable($resolved)
-                    && false !== \stripos($item, 'factory')
-                ) {
-                    $resolved = $this->call($resolved);
+                if ($this->isCallable($resolved)) {
+                    if (false !== \stripos($item, 'factory')) {
+                        $resolved = $this->call($resolved);
+                    } else {
+                        $resolved = new $id();
+                    }
                 }
                 $item = $resolved;
             } elseif (\is_callable($item)) {

@@ -11,6 +11,7 @@ use m0rtis\SimpleBox\Tests\Mocks\ClassWithDependencies;
 use m0rtis\SimpleBox\Tests\Mocks\DependencyOne;
 use m0rtis\SimpleBox\Tests\Mocks\DependencyTwo;
 use m0rtis\SimpleBox\Tests\Mocks\DependencyTwoFactory;
+use m0rtis\SimpleBox\Tests\Mocks\Invokable;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
@@ -93,8 +94,10 @@ class ContainerTest extends TestCase
             ]
         );
         $test = $container->get('test');
-
         $this->assertInstanceOf(ClassWithDependencies::class, $test);
+
+        $invokableButNotAFactory = $container->get(Invokable::class);
+        $this->assertTrue($invokableButNotAFactory());
     }
 
     public function testCall(): void
