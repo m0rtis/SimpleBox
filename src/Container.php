@@ -75,11 +75,9 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     public function has($id): bool
     {
         $id = (string)$id;
-        $result = isset($this->data[$id]);
-        if (!$result && !($result = $this->isCallable($id)) && \class_exists($id)) {
-            $result = $this->canInstantiate($id);
-        }
-        return $result;
+        return  isset($this->data[$id])
+                ?: $this->isCallable($id)
+                ?: (\class_exists($id) && $this->canInstantiate($id));
     }
 
     /**
@@ -335,7 +333,7 @@ class Container implements ContainerInterface, \ArrayAccess, \Iterator, \Countab
     {
         if (\is_callable($callable)) {
             $result = $callable($this);
-        } elseif ($this->isInvokable($callable)) {
+        } elseif (\is_string($callable) && $this->isInvokable($callable)) {
             $result = (new $callable())($this);
         } else {
             throw new \RuntimeException(
