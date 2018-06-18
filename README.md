@@ -15,7 +15,7 @@ composer require m0rtis/simplebox
 
 ## Usage
 
-####Basic
+#### Basic
 
 If you don't need autowiring you should to use `m0rtis\SimpleBox\Container` class in your application. 
 ```php
